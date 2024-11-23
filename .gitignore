@@ -1,0 +1,4 @@
+#ignore the following directories "Pendulum_data" and "Pendulum_data_10000"
+Pendulum_data/
+Pendulum_data_10000/
+```
