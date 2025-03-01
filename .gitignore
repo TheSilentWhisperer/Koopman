@@ -1,4 +1,6 @@
 #ignore the following directories "Pendulum_data" and "Pendulum_data_10000"
 Pendulum_data/
 Pendulum_data_10000/
+pendulum_v_l=0.6_control_sd=200_a=0.167_64_64_bw/
+pendulum_v_l=0.6_control_sd=200_a=0.167_64_64_bw_10000/
 ```

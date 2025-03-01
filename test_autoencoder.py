@@ -1,36 +1,35 @@
 import os
 import numpy as np
 from Dataset import VideoDataset
-from Model import StackedCAE
+from Model import StackedCAE, Predictor
 from torch.utils.data import DataLoader
 import torch
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import imageio as iio
+from Dataset import get_args
 
+def get_reconstructed_video(autoencoder, video):
+    autoencoder.eval()
 
-
-def visualize_model(model, video, layer, device):
-    
-    model.eval()
     with torch.no_grad():
-        video = video.to(device).flatten(0, 1)
-        video = model.precompute(video, layer)
-        reconstructed_video = model(video, layer)
+        latent_video = autoencoder.encoder(video)
+        reconstructed_video = autoencoder.decoder(latent_video)
 
-    video = video[:, 0:1, :, :]
-    reconstructed_video = reconstructed_video[:, 0:1, :, :]
+    return reconstructed_video
 
-    print(video.shape)
-    print(reconstructed_video.shape)
-
+def unnormalize(video):
     video = video.cpu().expand(-1, 3, -1, -1).permute(0, 2, 3, 1).clone()
-    reconstructed_video = reconstructed_video.cpu().expand(-1, 3, -1, -1).permute(0, 2, 3, 1).clone()
-
     video += 0.5
     video *= 255
+    return video
 
-    reconstructed_video += 0.5
-    reconstructed_video *= 255
+def visualize_model(autoencoder, video):
+
+    reconstructed_video = get_reconstructed_video(autoencoder, video)
+
+    video = unnormalize(video)
+    reconstructed_video = unnormalize(reconstructed_video)
 
     fig, ax = plt.subplots(1, 2)
     ax[0].axis("off")
@@ -52,13 +51,22 @@ def visualize_model(model, video, layer, device):
     
     plt.show()
 
+def save_gif(autoencoder, video):
     
+    reconstructed_video = get_reconstructed_video(autoencoder, video)
+    video = unnormalize(video)
+    reconstructed_video = unnormalize(reconstructed_video)
+    iio.mimwrite("original_video.gif", video.numpy().astype(np.uint8), fps=20, subrectangles=True)
+    iio.mimwrite("reconstructed_video.gif", reconstructed_video.numpy().astype(np.uint8), fps=20, subrectangles=True)
+    iio.help("gif")
+
 
 if __name__ == "__main__":
     
-    root_path = "Pendulum_data_10000"
+    config = get_args()
+
+    root_path = config.root_path
     split = "test"
-    layer = -1
 
     nb_buckets = len(os.listdir(os.path.join(root_path, split)))
     bucket = np.random.randint(nb_buckets)
@@ -66,11 +74,12 @@ if __name__ == "__main__":
     dataset = VideoDataset(root_path, split, bucket)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
 
-    video = next(iter(dataloader))
-
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = StackedCAE().to(device)
-    model.load_state_dict(torch.load("model.pth"))
+video = next(iter(dataloader))[0].to(device)
 
-    visualize_model(model, video, layer, device)
+autoencoder = StackedCAE().to(device)
+autoencoder.load_state_dict(torch.load(config.auto_encoder_path))
+
+visualize_model(autoencoder, video)
+save_gif(autoencoder, video)
